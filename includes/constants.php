@@ -1,6 +1,4 @@
-<?php
-define('DB_NAME', getenv('DB_NAME') ?: 'train_up');
-define('DB_USER', getenv('DB_USER') ?: 'tableplus');
-define('DB_PASSWORD', getenv('DB_PASSWORD') ?: 'password');
-define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
-?>
+<?$host = 'sql212.infinityfree.com';
+$user = 'if0_40180454';
+$pass = 'DFFVnI7Dza5MA';
+$db   = 'if0_40180454_train_up';?>
