@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: train-up-api
+    env: php
+    buildCommand: "./render-build.sh"
+    startCommand: "php -S 0.0.0.0:\$PORT"
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: DB_HOST
+        fromDatabase:
+          name: train-up-db
+          property: host
+      - key: DB_USER
+        fromDatabase:
+          name: train-up-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: train-up-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: train-up-db
+          property: database
+
+databases:
+  - name: train-up-db
+    databaseName: train_up
+    user: train_up_user
+    plan: free
