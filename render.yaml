@@ -1,31 +1,17 @@
 services:
   - type: web
-    name: train-up-api
-    env: php
-    buildCommand: "./render-build.sh"
-    startCommand: "php -S 0.0.0.0:\$PORT"
-    envVars:
-      - key: PORT
-        value: 8000
-      - key: DB_HOST
-        fromDatabase:
-          name: train-up-db
-          property: host
-      - key: DB_USER
-        fromDatabase:
-          name: train-up-db
-          property: user
-      - key: DB_PASSWORD
-        fromDatabase:
-          name: train-up-db
-          property: password
-      - key: DB_NAME
-        fromDatabase:
-          name: train-up-db
-          property: database
-
-databases:
-  - name: train-up-db
-    databaseName: train_up
-    user: train_up_user
+    name: trainup-api
+    env: docker
     plan: free
+    region: oregon
+    docker:
+      dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DB_HOST
+        value: "sql212.infinityfree.com"
+      - key: DB_USER
+        value: "if0_40180454"
+      - key: DB_PASSWORD
+        value: "DFFVnI7Dza5MA"
+      - key: DB_NAME
+        value: "if0_40180454_train_up"
