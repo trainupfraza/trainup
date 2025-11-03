@@ -1,9 +1,9 @@
 <?php
 // Database Constants
-define('DB_SERVER', 'fdb1034.awardspace.net');
-define('DB_USERNAME', '4701937_trainup');
-define('DB_PASSWORD', 'gONECHIPO12*'); // You need to add your actual password
-define('DB_NAME', '4701937_trainup');
+define('DB_SERVER', 'http://sql8.freesqldatabase.com/');
+define('DB_USERNAME', 'sql8805800');
+define('DB_PASSWORD', 'WpKfZ6vfYc'); // You need to add your actual password
+define('DB_NAME', 'sql8805800');
 define('DB_PORT', 3306);
 
 // Attempt to connect to MySQL database
