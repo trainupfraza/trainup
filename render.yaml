@@ -8,10 +8,10 @@ services:
       dockerfilePath: ./Dockerfile
     envVars:
       - key: DB_HOST
-        value: "sql212.infinityfree.com"
+        value: "fdb1034.awardspace.net"
       - key: DB_USER
-        value: "if0_40180454"
+        value: "4701937_trainup"
       - key: DB_PASSWORD
-        value: "DFFVnI7Dza5MA"
+        value: "gONECHIPO12*"  # Replace with your actual password
       - key: DB_NAME
-        value: "if0_40180454_train_up"
+        value: "4701937_trainup"

@@ -1,16 +1,21 @@
 <?php
-// For Render deployment - connect to InfinityFree MySQL
-// Use environment variables with InfinityFree as fallback
-$db_host = getenv('DB_HOST') ?: 'sql212.infinityfree.com';
-$db_user = getenv('DB_USER') ?: 'if0_40180454';
-$db_pass = getenv('DB_PASSWORD') ?: 'DFFVnI7Dza5MA';
-$db_name = getenv('DB_NAME') ?: 'if0_40180454_train_up';
+// Database Constants
+define('DB_SERVER', 'fdb1034.awardspace.net');
+define('DB_USERNAME', '4701937_trainup');
+define('DB_PASSWORD', 'gONECHIPO12*'); // You need to add your actual password
+define('DB_NAME', '4701937_trainup');
+define('DB_PORT', 3306);
 
-define('DB_HOST', $db_host);
-define('DB_USER', $db_user);
-define('DB_PASSWORD', $db_pass);
-define('DB_NAME', $db_name);
+// Attempt to connect to MySQL database
+try {
+    $pdo = new PDO("mysql:host=" . DB_SERVER . ";port=" . DB_PORT . ";dbname=" . DB_NAME, DB_USERNAME, DB_PASSWORD);
+    // Set the PDO error mode to exception
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch(PDOException $e) {
+    die("ERROR: Could not connect. " . $e->getMessage());
+}
 
-// Debug connection info
-error_log("Connecting to database - Host: " . DB_HOST . ", DB: " . DB_NAME);
+// Application Constants
+define('APP_NAME', 'TrainUp');
+define('APP_VERSION', '1.0');
 ?>
