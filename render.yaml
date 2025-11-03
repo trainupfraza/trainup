@@ -8,7 +8,7 @@ services:
       dockerfilePath: ./Dockerfile
     envVars:
       - key: DB_HOST
-        value: "http://sql8.freesqldatabase.com/"
+        value: "sql8.freesqldatabase.com"
       - key: DB_USER
         value: "sql8805800"
       - key: DB_PASSWORD
