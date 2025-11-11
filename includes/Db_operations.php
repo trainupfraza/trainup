@@ -1,6 +1,4 @@
 <?php
-/* Converted to use PostgreSQL via PDO (pgsql). Automated conversion - please review. */
-<?php
 class Db_operations {
     private $con;
 
