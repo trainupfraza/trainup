@@ -1,11 +1,18 @@
 <?php
 class Db_operations {
     private $con;
+    private $stmtCounter = 0;
 
     function __construct(){
         require_once dirname(__FILE__).'/dbconnect.php';
         $db = new dbconnect();
         $this->con = $db->connect();
+    }
+
+    // Helper method to generate unique statement names
+    private function getStmtName($prefix) {
+        $this->stmtCounter++;
+        return $prefix . '_' . $this->stmtCounter . '_' . uniqid();
     }
 
     // -------------------------
@@ -17,8 +24,9 @@ class Db_operations {
         } else {
             $password = password_hash($pass, PASSWORD_BCRYPT);
             $sql = "INSERT INTO train_up_users (username, email, gender, password, weight) VALUES ($1, $2, $3, $4, $5)";
-            $result = pg_prepare($this->con, "create_user", $sql);
-            $result = pg_execute($this->con, "create_user", array($username, $email, $gender, $password, $weight));
+            $stmtName = $this->getStmtName("create_user");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($username, $email, $gender, $password, $weight));
             
             if ($result) {
                 return 0;
@@ -30,8 +38,9 @@ class Db_operations {
 
     public function userLogin($email, $pass) {
         $sql = "SELECT id, password FROM train_up_users WHERE email = $1";
-        $result = pg_prepare($this->con, "login_query", $sql);
-        $result = pg_execute($this->con, "login_query", array($email));
+        $stmtName = $this->getStmtName("login_query");
+        $result = pg_prepare($this->con, $stmtName, $sql);
+        $result = pg_execute($this->con, $stmtName, array($email));
         
         if (pg_num_rows($result) == 0) {
             return 0;
@@ -46,29 +55,33 @@ class Db_operations {
 
     public function getUserByUsername($username){
         $sql = "SELECT * FROM train_up_users WHERE username = $1";
-        $result = pg_prepare($this->con, "get_user_username", $sql);
-        $result = pg_execute($this->con, "get_user_username", array($username));
+        $stmtName = $this->getStmtName("get_user_username");
+        $result = pg_prepare($this->con, $stmtName, $sql);
+        $result = pg_execute($this->con, $stmtName, array($username));
         return pg_fetch_assoc($result);
     }
 
     public function getUserByEmail($useremail){
         $sql = "SELECT * FROM train_up_users WHERE email = $1";
-        $result = pg_prepare($this->con, "get_user_email", $sql);
-        $result = pg_execute($this->con, "get_user_email", array($useremail));
+        $stmtName = $this->getStmtName("get_user_email");
+        $result = pg_prepare($this->con, $stmtName, $sql);
+        $result = pg_execute($this->con, $stmtName, array($useremail));
         return pg_fetch_assoc($result);
     }
 
     private function isUserExist($username, $email){
         $sql = "SELECT id FROM train_up_users WHERE username = $1 OR email = $2";
-        $result = pg_prepare($this->con, "user_exist", $sql);
-        $result = pg_execute($this->con, "user_exist", array($username, $email));
+        $stmtName = $this->getStmtName("user_exist");
+        $result = pg_prepare($this->con, $stmtName, $sql);
+        $result = pg_execute($this->con, $stmtName, array($username, $email));
         return pg_num_rows($result) > 0;
     }
 
     public function deleteUser($userId) {
         $sql = "DELETE FROM train_up_users WHERE id = $1";
-        $result = pg_prepare($this->con, "delete_user", $sql);
-        $result = pg_execute($this->con, "delete_user", array($userId));
+        $stmtName = $this->getStmtName("delete_user");
+        $result = pg_prepare($this->con, $stmtName, $sql);
+        $result = pg_execute($this->con, $stmtName, array($userId));
         
         if ($result) {
             if (pg_affected_rows($result) > 0) {
@@ -86,8 +99,9 @@ class Db_operations {
     // -------------------------
     public function saveRunningActivity($userId, $distanceKm, $timeMinutes, $weather, $speedKmh, $caloriesBurned, $note) {
         $sql = "INSERT INTO running_activities (user_id, distance_km, time_minutes, weather, speed_kmh, calories_burned, note) VALUES ($1, $2, $3, $4, $5, $6, $7)";
-        $result = pg_prepare($this->con, "save_running", $sql);
-        $result = pg_execute($this->con, "save_running", array($userId, $distanceKm, $timeMinutes, $weather, $speedKmh, $caloriesBurned, $note));
+        $stmtName = $this->getStmtName("save_running");
+        $result = pg_prepare($this->con, $stmtName, $sql);
+        $result = pg_execute($this->con, $stmtName, array($userId, $distanceKm, $timeMinutes, $weather, $speedKmh, $caloriesBurned, $note));
         
         if ($result) {
             return array("error" => false, "message" => "Running activity saved successfully");
@@ -98,8 +112,9 @@ class Db_operations {
 
     public function saveCyclingActivity($userId, $distanceKm, $timeMinutes, $weather, $bikeType, $speedKmh, $caloriesBurned, $note) {
         $sql = "INSERT INTO cycling_activities (user_id, distance, time_minutes, weather, bike_type, speed, calories, note) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)";
-        $result = pg_prepare($this->con, "save_cycling", $sql);
-        $result = pg_execute($this->con, "save_cycling", array($userId, $distanceKm, $timeMinutes, $weather, $bikeType, $speedKmh, $caloriesBurned, $note));
+        $stmtName = $this->getStmtName("save_cycling");
+        $result = pg_prepare($this->con, $stmtName, $sql);
+        $result = pg_execute($this->con, $stmtName, array($userId, $distanceKm, $timeMinutes, $weather, $bikeType, $speedKmh, $caloriesBurned, $note));
         
         if ($result) {
             return array("error" => false, "message" => "Cycling activity saved successfully");
@@ -110,8 +125,9 @@ class Db_operations {
 
     public function saveWeightliftingActivity($userId, $exerciseName, $sets, $reps, $weightKg, $timeMinutes, $calories, $note) {
         $sql = "INSERT INTO weightlifting_activities (user_id, exercise_name, sets, reps, weight_kg, time_minutes, calories, note) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)";
-        $result = pg_prepare($this->con, "save_weightlifting", $sql);
-        $result = pg_execute($this->con, "save_weightlifting", array($userId, $exerciseName, $sets, $reps, $weightKg, $timeMinutes, $calories, $note));
+        $stmtName = $this->getStmtName("save_weightlifting");
+        $result = pg_prepare($this->con, $stmtName, $sql);
+        $result = pg_execute($this->con, $stmtName, array($userId, $exerciseName, $sets, $reps, $weightKg, $timeMinutes, $calories, $note));
         
         if ($result) {
             return array("error" => false, "message" => "Weightlifting activity saved successfully");
@@ -122,8 +138,9 @@ class Db_operations {
 
     public function saveYogaActivity($userId, $sessionType, $durationMinutes, $intensity, $calories, $note) {
         $sql = "INSERT INTO yoga_activities (user_id, session_type, duration_minutes, intensity, calories, note) VALUES ($1, $2, $3, $4, $5, $6)";
-        $result = pg_prepare($this->con, "save_yoga", $sql);
-        $result = pg_execute($this->con, "save_yoga", array($userId, $sessionType, $durationMinutes, $intensity, $calories, $note));
+        $stmtName = $this->getStmtName("save_yoga");
+        $result = pg_prepare($this->con, $stmtName, $sql);
+        $result = pg_execute($this->con, $stmtName, array($userId, $sessionType, $durationMinutes, $intensity, $calories, $note));
         
         if ($result) {
             return array("error" => false, "message" => "Yoga activity saved successfully");
@@ -134,8 +151,9 @@ class Db_operations {
 
     public function saveSwimmingActivity($userId, $distanceMeters, $timeMinutes, $weather, $strokeType, $speedMps, $caloriesBurned, $note) {
         $sql = "INSERT INTO swimming_activities (user_id, distance_meters, time_minutes, weather, stroke_type, speed_mps, calories_burned, note) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)";
-        $result = pg_prepare($this->con, "save_swimming", $sql);
-        $result = pg_execute($this->con, "save_swimming", array($userId, $distanceMeters, $timeMinutes, $weather, $strokeType, $speedMps, $caloriesBurned, $note));
+        $stmtName = $this->getStmtName("save_swimming");
+        $result = pg_prepare($this->con, $stmtName, $sql);
+        $result = pg_execute($this->con, $stmtName, array($userId, $distanceMeters, $timeMinutes, $weather, $strokeType, $speedMps, $caloriesBurned, $note));
         
         if ($result) {
             return array("error" => false, "message" => "Swimming activity saved successfully");
@@ -146,8 +164,9 @@ class Db_operations {
 
     public function saveWalkingActivity($userId, $distanceKm, $timeMinutes, $weather, $speedKmh, $caloriesBurned, $note) {
         $sql = "INSERT INTO walking_activities (user_id, distance_km, time_minutes, weather, speed_kmh, calories_burned, note) VALUES ($1, $2, $3, $4, $5, $6, $7)";
-        $result = pg_prepare($this->con, "save_walking", $sql);
-        $result = pg_execute($this->con, "save_walking", array($userId, $distanceKm, $timeMinutes, $weather, $speedKmh, $caloriesBurned, $note));
+        $stmtName = $this->getStmtName("save_walking");
+        $result = pg_prepare($this->con, $stmtName, $sql);
+        $result = pg_execute($this->con, $stmtName, array($userId, $distanceKm, $timeMinutes, $weather, $speedKmh, $caloriesBurned, $note));
         
         if ($result) {
             return array("error" => false, "message" => "Walking activity saved successfully");
@@ -161,8 +180,9 @@ class Db_operations {
     // -------------------------
     public function saveGoal($userId, $activityType, $durationOption = null, $notes = null) {
         $sql = "INSERT INTO goals (user_id, activity_type, duration_option, notes) VALUES ($1, $2, $3, $4) RETURNING id";
-        $result = pg_prepare($this->con, "save_goal", $sql);
-        $result = pg_execute($this->con, "save_goal", array($userId, $activityType, $durationOption, $notes));
+        $stmtName = $this->getStmtName("save_goal");
+        $result = pg_prepare($this->con, $stmtName, $sql);
+        $result = pg_execute($this->con, $stmtName, array($userId, $activityType, $durationOption, $notes));
         
         if ($result) {
             $row = pg_fetch_assoc($result);
@@ -175,8 +195,9 @@ class Db_operations {
 
     public function saveGoalTarget($goalId, $metricKey, $value, $unit = null) {
         $sql = "INSERT INTO goal_targets (goal_id, metric_key, value, unit) VALUES ($1, $2, $3, $4)";
-        $result = pg_prepare($this->con, "save_goal_target", $sql);
-        $result = pg_execute($this->con, "save_goal_target", array($goalId, $metricKey, $value, $unit));
+        $stmtName = $this->getStmtName("save_goal_target");
+        $result = pg_prepare($this->con, $stmtName, $sql);
+        $result = pg_execute($this->con, $stmtName, array($goalId, $metricKey, $value, $unit));
         
         if ($result) {
             return array('error' => false, 'message' => 'Target saved');
@@ -216,16 +237,18 @@ class Db_operations {
 
             // Today's total activities
             $sql = "SELECT COUNT(*) as total FROM $table WHERE user_id = $1 AND $date_col BETWEEN $2 AND $3";
-            $result = pg_prepare($this->con, "today_$table", $sql);
-            $result = pg_execute($this->con, "today_$table", array($userId, $today_start, $today_end));
+            $stmtName = $this->getStmtName("today_" . $table);
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId, $today_start, $today_end));
             $today_result = pg_fetch_assoc($result);
             $today_count = intval($today_result['total'] ?? 0);
             $today_total += $today_count;
 
             // Weekly total + calories
             $sql = "SELECT COUNT(*) as total, COALESCE(SUM($cal_col), 0) as total_calories FROM $table WHERE user_id = $1 AND $date_col BETWEEN $2 AND $3";
-            $result = pg_prepare($this->con, "week_$table", $sql);
-            $result = pg_execute($this->con, "week_$table", array($userId, $week_start, $week_end));
+            $stmtName = $this->getStmtName("week_" . $table);
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId, $week_start, $week_end));
             $week_result = pg_fetch_assoc($result);
             $week_count = intval($week_result['total'] ?? 0);
             $week_cal = floatval($week_result['total_calories'] ?? 0);
@@ -255,16 +278,18 @@ class Db_operations {
                     WHERE g.user_id = $1 
                     ORDER BY g.created_at DESC 
                     LIMIT 100";
-            $result = pg_prepare($this->con, "get_user_goals", $sql);
-            $result = pg_execute($this->con, "get_user_goals", array($userId));
+            $stmtName = $this->getStmtName("get_user_goals");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
 
             $goals = array();
             while ($goal = pg_fetch_assoc($result)) {
                 $goalId = $goal['id'];
 
                 $targetSql = "SELECT metric_key, value, unit FROM goal_targets WHERE goal_id = $1";
-                $targetResult = pg_prepare($this->con, "get_goal_targets", $targetSql);
-                $targetResult = pg_execute($this->con, "get_goal_targets", array($goalId));
+                $targetStmtName = $this->getStmtName("get_goal_targets");
+                $targetResult = pg_prepare($this->con, $targetStmtName, $targetSql);
+                $targetResult = pg_execute($this->con, $targetStmtName, array($goalId));
 
                 $targets = array();
                 while ($target = pg_fetch_assoc($targetResult)) {
@@ -341,8 +366,9 @@ class Db_operations {
         try {
             // Running average pace
             $sql = "SELECT AVG(speed_kmh) as avg_speed FROM running_activities WHERE user_id = $1 AND speed_kmh > 0";
-            $result = pg_prepare($this->con, "running_avg", $sql);
-            $result = pg_execute($this->con, "running_avg", array($userId));
+            $stmtName = $this->getStmtName("running_avg");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $runningResult = pg_fetch_assoc($result);
             $avgRunningSpeed = floatval($runningResult['avg_speed'] ?? 0);
             $avgPace = $avgRunningSpeed > 0 ? (60 / $avgRunningSpeed) : 0.0;
@@ -350,8 +376,9 @@ class Db_operations {
 
             // Walking average pace
             $sql = "SELECT AVG(speed_kmh) as avg_speed FROM walking_activities WHERE user_id = $1 AND speed_kmh > 0";
-            $result = pg_prepare($this->con, "walking_avg", $sql);
-            $result = pg_execute($this->con, "walking_avg", array($userId));
+            $stmtName = $this->getStmtName("walking_avg");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $walkingResult = pg_fetch_assoc($result);
             $avgWalkingSpeed = floatval($walkingResult['avg_speed'] ?? 0);
             $avgWalkingPace = $avgWalkingSpeed > 0 ? (60 / $avgWalkingSpeed) : 0.0;
@@ -359,8 +386,9 @@ class Db_operations {
 
             // Swimming average pace
             $sql = "SELECT AVG(speed_mps) as avg_speed FROM swimming_activities WHERE user_id = $1 AND speed_mps > 0";
-            $result = pg_prepare($this->con, "swimming_avg", $sql);
-            $result = pg_execute($this->con, "swimming_avg", array($userId));
+            $stmtName = $this->getStmtName("swimming_avg");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $swimResult = pg_fetch_assoc($result);
             $avgSwimSpeed = floatval($swimResult['avg_speed'] ?? 0);
             if ($avgSwimSpeed > 0) {
@@ -372,22 +400,25 @@ class Db_operations {
 
             // Cycling average speed
             $sql = "SELECT AVG(speed) as avg_speed FROM cycling_activities WHERE user_id = $1 AND speed > 0";
-            $result = pg_prepare($this->con, "cycling_avg", $sql);
-            $result = pg_execute($this->con, "cycling_avg", array($userId));
+            $stmtName = $this->getStmtName("cycling_avg");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $cyclingResult = pg_fetch_assoc($result);
             $metrics['avg_cycling_speed'] = $cyclingResult['avg_speed'] ? number_format(floatval($cyclingResult['avg_speed']), 1) : "0.0";
 
             // Max weight lifted
             $sql = "SELECT MAX(weight_kg) as max_weight FROM weightlifting_activities WHERE user_id = $1";
-            $result = pg_prepare($this->con, "max_weight", $sql);
-            $result = pg_execute($this->con, "max_weight", array($userId));
+            $stmtName = $this->getStmtName("max_weight");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $weightResult = pg_fetch_assoc($result);
             $metrics['max_weight'] = $weightResult['max_weight'] !== null ? intval($weightResult['max_weight']) : 0;
 
             // Average yoga duration
             $sql = "SELECT AVG(duration_minutes) as avg_duration FROM yoga_activities WHERE user_id = $1";
-            $result = pg_prepare($this->con, "yoga_avg", $sql);
-            $result = pg_execute($this->con, "yoga_avg", array($userId));
+            $stmtName = $this->getStmtName("yoga_avg");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $yogaResult = pg_fetch_assoc($result);
             $metrics['avg_yoga_duration'] = $yogaResult['avg_duration'] ? round(floatval($yogaResult['avg_duration'])) : 0;
 
@@ -412,43 +443,49 @@ class Db_operations {
         try {
             // Longest run
             $sql = "SELECT MAX(distance_km) as longest_run FROM running_activities WHERE user_id = $1";
-            $result = pg_prepare($this->con, "longest_run", $sql);
-            $result = pg_execute($this->con, "longest_run", array($userId));
+            $stmtName = $this->getStmtName("longest_run");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $runResult = pg_fetch_assoc($result);
             $records['longest_run'] = $runResult['longest_run'] !== null ? number_format(floatval($runResult['longest_run']), 1) : "0.0";
 
             // Longest cycling ride
             $sql = "SELECT MAX(distance) as longest_ride FROM cycling_activities WHERE user_id = $1";
-            $result = pg_prepare($this->con, "longest_ride", $sql);
-            $result = pg_execute($this->con, "longest_ride", array($userId));
+            $stmtName = $this->getStmtName("longest_ride");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $cycleResult = pg_fetch_assoc($result);
             $records['longest_ride'] = $cycleResult['longest_ride'] !== null ? number_format(floatval($cycleResult['longest_ride']), 1) : "0.0";
 
             // Heaviest weight lifted
             $sql = "SELECT MAX(weight_kg) as heaviest_lift FROM weightlifting_activities WHERE user_id = $1";
-            $result = pg_prepare($this->con, "heaviest_lift", $sql);
-            $result = pg_execute($this->con, "heaviest_lift", array($userId));
+            $stmtName = $this->getStmtName("heaviest_lift");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $weightResult = pg_fetch_assoc($result);
             $records['heaviest_lift'] = $weightResult['heaviest_lift'] !== null ? intval($weightResult['heaviest_lift']) : 0;
 
             // Longest swim
             $sql = "SELECT MAX(distance_meters) as longest_swim FROM swimming_activities WHERE user_id = $1";
-            $result = pg_prepare($this->con, "longest_swim", $sql);
-            $result = pg_execute($this->con, "longest_swim", array($userId));
+            $stmtName = $this->getStmtName("longest_swim");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $swimResult = pg_fetch_assoc($result);
             $records['longest_swim'] = $swimResult['longest_swim'] !== null ? number_format((floatval($swimResult['longest_swim']) / 1000.0), 1) : "0.0";
 
             // Longest walk
             $sql = "SELECT MAX(distance_km) as longest_walk FROM walking_activities WHERE user_id = $1";
-            $result = pg_prepare($this->con, "longest_walk", $sql);
-            $result = pg_execute($this->con, "longest_walk", array($userId));
+            $stmtName = $this->getStmtName("longest_walk");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $walkResult = pg_fetch_assoc($result);
             $records['longest_walk'] = $walkResult['longest_walk'] !== null ? number_format(floatval($walkResult['longest_walk']), 1) : "0.0";
 
             // Longest yoga session
             $sql = "SELECT MAX(duration_minutes) as longest_yoga FROM yoga_activities WHERE user_id = $1";
-            $result = pg_prepare($this->con, "longest_yoga", $sql);
-            $result = pg_execute($this->con, "longest_yoga", array($userId));
+            $stmtName = $this->getStmtName("longest_yoga");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $yogaResult = pg_fetch_assoc($result);
             $records['longest_yoga'] = $yogaResult['longest_yoga'] !== null ? intval($yogaResult['longest_yoga']) : 0;
 
@@ -622,8 +659,9 @@ class Db_operations {
             $endDate = $timeWindow['end'];
 
             $sql = "SELECT MAX($column) as best_value FROM $table WHERE user_id = $1 AND $column > 0 AND created_at BETWEEN $2 AND $3";
-            $result = pg_prepare($this->con, "best_performance", $sql);
-            $result = pg_execute($this->con, "best_performance", array($userId, $startDate, $endDate));
+            $stmtName = $this->getStmtName("best_performance");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId, $startDate, $endDate));
             $result = pg_fetch_assoc($result);
             $bestValue = floatval($result['best_value'] ?? 0);
             return $bestValue;
@@ -710,8 +748,9 @@ class Db_operations {
 
             foreach ($tables as $table) {
                 $sql = "SELECT COUNT(*) as count FROM $table WHERE user_id = $1";
-                $result = pg_prepare($this->con, "count_$table", $sql);
-                $result = pg_execute($this->con, "count_$table", array($userId));
+                $stmtName = $this->getStmtName("count_" . $table);
+                $result = pg_prepare($this->con, $stmtName, $sql);
+                $result = pg_execute($this->con, $stmtName, array($userId));
                 $result = pg_fetch_assoc($result);
                 $count = intval($result['count'] ?? 0);
                 $counts[$table] = $count;
@@ -762,8 +801,9 @@ class Db_operations {
                     ) AS all_activities 
                     WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'";
             
-            $result = pg_prepare($this->con, "current_streak", $sql);
-            $result = pg_execute($this->con, "current_streak", array($userId, $userId, $userId, $userId, $userId, $userId));
+            $stmtName = $this->getStmtName("current_streak");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId, $userId, $userId, $userId, $userId, $userId));
             $result = pg_fetch_assoc($result);
             return intval($result['active_days'] ?? 0);
 
@@ -794,43 +834,49 @@ class Db_operations {
             
             // Running calories
             $sql = "SELECT COALESCE(SUM(calories_burned), 0) as total_calories FROM running_activities WHERE user_id = $1 AND created_at BETWEEN $2 AND $3";
-            $result = pg_prepare($this->con, "month_running", $sql);
-            $result = pg_execute($this->con, "month_running", array($userId, $currentMonthStart, $currentMonthEnd));
+            $stmtName = $this->getStmtName("month_running");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId, $currentMonthStart, $currentMonthEnd));
             $result = pg_fetch_assoc($result);
             $caloriesData['running'] = floatval($result['total_calories'] ?? 0);
             
             // Cycling calories
             $sql = "SELECT COALESCE(SUM(calories), 0) as total_calories FROM cycling_activities WHERE user_id = $1 AND created_at BETWEEN $2 AND $3";
-            $result = pg_prepare($this->con, "month_cycling", $sql);
-            $result = pg_execute($this->con, "month_cycling", array($userId, $currentMonthStart, $currentMonthEnd));
+            $stmtName = $this->getStmtName("month_cycling");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId, $currentMonthStart, $currentMonthEnd));
             $result = pg_fetch_assoc($result);
             $caloriesData['cycling'] = floatval($result['total_calories'] ?? 0);
             
             // Weightlifting calories
             $sql = "SELECT COALESCE(SUM(calories), 0) as total_calories FROM weightlifting_activities WHERE user_id = $1 AND created_at BETWEEN $2 AND $3";
-            $result = pg_prepare($this->con, "month_weightlifting", $sql);
-            $result = pg_execute($this->con, "month_weightlifting", array($userId, $currentMonthStart, $currentMonthEnd));
+            $stmtName = $this->getStmtName("month_weightlifting");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId, $currentMonthStart, $currentMonthEnd));
             $result = pg_fetch_assoc($result);
             $caloriesData['weightlifting'] = floatval($result['total_calories'] ?? 0);
             
             // Yoga calories
             $sql = "SELECT COALESCE(SUM(calories), 0) as total_calories FROM yoga_activities WHERE user_id = $1 AND created_at BETWEEN $2 AND $3";
-            $result = pg_prepare($this->con, "month_yoga", $sql);
-            $result = pg_execute($this->con, "month_yoga", array($userId, $currentMonthStart, $currentMonthEnd));
+            $stmtName = $this->getStmtName("month_yoga");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId, $currentMonthStart, $currentMonthEnd));
             $result = pg_fetch_assoc($result);
             $caloriesData['yoga'] = floatval($result['total_calories'] ?? 0);
             
             // Swimming calories
             $sql = "SELECT COALESCE(SUM(calories_burned), 0) as total_calories FROM swimming_activities WHERE user_id = $1 AND created_at BETWEEN $2 AND $3";
-            $result = pg_prepare($this->con, "month_swimming", $sql);
-            $result = pg_execute($this->con, "month_swimming", array($userId, $currentMonthStart, $currentMonthEnd));
+            $stmtName = $this->getStmtName("month_swimming");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId, $currentMonthStart, $currentMonthEnd));
             $result = pg_fetch_assoc($result);
             $caloriesData['swimming'] = floatval($result['total_calories'] ?? 0);
             
             // Walking calories
             $sql = "SELECT COALESCE(SUM(calories_burned), 0) as total_calories FROM walking_activities WHERE user_id = $1 AND created_at BETWEEN $2 AND $3";
-            $result = pg_prepare($this->con, "month_walking", $sql);
-            $result = pg_execute($this->con, "month_walking", array($userId, $currentMonthStart, $currentMonthEnd));
+            $stmtName = $this->getStmtName("month_walking");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId, $currentMonthStart, $currentMonthEnd));
             $result = pg_fetch_assoc($result);
             $caloriesData['walking'] = floatval($result['total_calories'] ?? 0);
             
@@ -882,8 +928,9 @@ class Db_operations {
         
         foreach ($tables as $table) {
             $sql = "SELECT COUNT(*) as count FROM $table WHERE user_id = $1";
-            $result = pg_prepare($this->con, "total_$table", $sql);
-            $result = pg_execute($this->con, "total_$table", array($userId));
+            $stmtName = $this->getStmtName("total_" . $table);
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $result = pg_fetch_assoc($result);
             $totalCount += intval($result['count'] ?? 0);
         }
@@ -893,8 +940,9 @@ class Db_operations {
 
     private function getTotalGoalsCount($userId) {
         $sql = "SELECT COUNT(*) as total_goals FROM goals WHERE user_id = $1";
-        $result = pg_prepare($this->con, "total_goals", $sql);
-        $result = pg_execute($this->con, "total_goals", array($userId));
+        $stmtName = $this->getStmtName("total_goals");
+        $result = pg_prepare($this->con, $stmtName, $sql);
+        $result = pg_execute($this->con, $stmtName, array($userId));
         $result = pg_fetch_assoc($result);
         return intval($result['total_goals'] ?? 0);
     }
@@ -910,8 +958,9 @@ class Db_operations {
 
             // Running activities
             $sql = "SELECT id, 'running' as activity_type, distance_km, time_minutes, weather, speed_kmh, calories_burned as calories, note, created_at FROM running_activities WHERE user_id = $1 ORDER BY created_at DESC";
-            $result = pg_prepare($this->con, "all_running", $sql);
-            $result = pg_execute($this->con, "all_running", array($userId));
+            $stmtName = $this->getStmtName("all_running");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $rows = pg_fetch_all($result);
             if ($rows) {
                 foreach($rows as $row) {
@@ -921,8 +970,9 @@ class Db_operations {
 
             // Cycling activities
             $sql = "SELECT id, 'cycling' as activity_type, distance as distance_km, time_minutes, weather, speed as speed_kmh, calories, note, created_at FROM cycling_activities WHERE user_id = $1 ORDER BY created_at DESC";
-            $result = pg_prepare($this->con, "all_cycling", $sql);
-            $result = pg_execute($this->con, "all_cycling", array($userId));
+            $stmtName = $this->getStmtName("all_cycling");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $rows = pg_fetch_all($result);
             if ($rows) {
                 foreach($rows as $row) {
@@ -932,8 +982,9 @@ class Db_operations {
 
             // Walking activities
             $sql = "SELECT id, 'walking' as activity_type, distance_km, time_minutes, weather, speed_kmh, calories_burned as calories, note, created_at FROM walking_activities WHERE user_id = $1 ORDER BY created_at DESC";
-            $result = pg_prepare($this->con, "all_walking", $sql);
-            $result = pg_execute($this->con, "all_walking", array($userId));
+            $stmtName = $this->getStmtName("all_walking");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $rows = pg_fetch_all($result);
             if ($rows) {
                 foreach($rows as $row) {
@@ -943,8 +994,9 @@ class Db_operations {
 
             // Swimming activities
             $sql = "SELECT id, 'swimming' as activity_type, distance_meters, time_minutes, weather, stroke_type, speed_mps, calories_burned as calories, note, created_at FROM swimming_activities WHERE user_id = $1 ORDER BY created_at DESC";
-            $result = pg_prepare($this->con, "all_swimming", $sql);
-            $result = pg_execute($this->con, "all_swimming", array($userId));
+            $stmtName = $this->getStmtName("all_swimming");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $rows = pg_fetch_all($result);
             if ($rows) {
                 foreach($rows as $row) {
@@ -954,8 +1006,9 @@ class Db_operations {
 
             // Yoga activities
             $sql = "SELECT id, 'yoga' as activity_type, session_type, duration_minutes as time_minutes, intensity, calories, note, created_at FROM yoga_activities WHERE user_id = $1 ORDER BY created_at DESC";
-            $result = pg_prepare($this->con, "all_yoga", $sql);
-            $result = pg_execute($this->con, "all_yoga", array($userId));
+            $stmtName = $this->getStmtName("all_yoga");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $rows = pg_fetch_all($result);
             if ($rows) {
                 foreach($rows as $row) {
@@ -965,8 +1018,9 @@ class Db_operations {
 
             // Weightlifting activities
             $sql = "SELECT id, 'weightlifting' as activity_type, exercise_name, sets, reps, weight_kg, time_minutes, calories, note, created_at FROM weightlifting_activities WHERE user_id = $1 ORDER BY created_at DESC";
-            $result = pg_prepare($this->con, "all_weightlifting", $sql);
-            $result = pg_execute($this->con, "all_weightlifting", array($userId));
+            $stmtName = $this->getStmtName("all_weightlifting");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($userId));
             $rows = pg_fetch_all($result);
             if ($rows) {
                 foreach($rows as $row) {
@@ -1013,8 +1067,9 @@ class Db_operations {
             }
 
             $sql = "DELETE FROM $table WHERE id = $1 AND user_id = $2";
-            $result = pg_prepare($this->con, "delete_activity", $sql);
-            $result = pg_execute($this->con, "delete_activity", array($activityId, $userId));
+            $stmtName = $this->getStmtName("delete_activity");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($activityId, $userId));
             
             if ($result) {
                 if (pg_affected_rows($result) > 0) {
@@ -1045,13 +1100,15 @@ class Db_operations {
         try {
             // First delete goal targets
             $sql = "DELETE FROM goal_targets WHERE goal_id = $1";
-            $result = pg_prepare($this->con, "delete_goal_targets", $sql);
-            $result = pg_execute($this->con, "delete_goal_targets", array($goalId));
+            $stmtName = $this->getStmtName("delete_goal_targets");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($goalId));
 
             // Then delete the goal
             $sql = "DELETE FROM goals WHERE id = $1 AND user_id = $2";
-            $result = pg_prepare($this->con, "delete_goal", $sql);
-            $result = pg_execute($this->con, "delete_goal", array($goalId, $userId));
+            $stmtName = $this->getStmtName("delete_goal");
+            $result = pg_prepare($this->con, $stmtName, $sql);
+            $result = pg_execute($this->con, $stmtName, array($goalId, $userId));
             
             if ($result) {
                 if (pg_affected_rows($result) > 0) {
