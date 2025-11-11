@@ -1,11 +1,13 @@
 <?php
+/* Converted to use PostgreSQL via PDO (pgsql). Automated conversion - please review. */
+<?php
 class Db_operations {
     private $con;
 
     function __construct(){
         require_once dirname(__FILE__).'/dbconnect.php';
         $db = new dbconnect();
-        $this->con = $db->getConnection();
+        $this->con = $db->connect();
     }
 
     // -------------------------
@@ -27,7 +29,9 @@ class Db_operations {
                 return 2;
             }
 
-            if ($createuserquerry->execute([$username, $email, $gender, $password, $weight])) {
+            $createuserquerry->bind_param("sssss", $username, $email,$gender, $password,$weight);
+
+            if ($createuserquerry->execute()) {
                 return 0;
             } else {
                 return 2;
@@ -39,13 +43,20 @@ class Db_operations {
     {
         $sql = "SELECT id, password FROM train_up_users WHERE email = ?";
         $userloginquerry = $this->con->prepare($sql);
-        
-        if ($userloginquerry->execute([$email])) {
-            $user = $userloginquerry->fetch(PDO::FETCH_ASSOC);
-            
-            if($user && password_verify($pass, $user['password'])){
-                return $user['id']; // return user id on success
-            }
+        $userloginquerry->bind_param("s", $email);
+        $userloginquerry->execute();
+
+        $userloginquerry->store_result();
+
+        if($userloginquerry->num_rows == 0){
+            return 0;
+        }
+
+        $userloginquerry->bind_result($id, $dbPassword);
+        $userloginquerry->fetch();
+
+        if(password_verify($pass, $dbPassword)){
+            return $id; // return user id on success
         }
 
         return 0;
@@ -54,43 +65,43 @@ class Db_operations {
     public function getUserByUsername($username){
         $sql = "SELECT * FROM train_up_users WHERE username = ?";
         $getuserquerry = $this->con->prepare($sql);
-        if ($getuserquerry->execute([$username])) {
-            return $getuserquerry->fetch(PDO::FETCH_ASSOC);
-        }
-        return null;
+        $getuserquerry->bind_param("s", $username);
+        $getuserquerry->execute();
+        return $getuserquerry->fetch(PDO::FETCH_ASSOC);
     }
 
     public function getUserByEmail($useremail){
         $sql = "SELECT * FROM train_up_users WHERE email = ?";
         $getuserquerry = $this->con->prepare($sql);
-        if ($getuserquerry->execute([$useremail])) {
-            return $getuserquerry->fetch(PDO::FETCH_ASSOC);
-        }
-        return null;
+        $getuserquerry->bind_param("s", $useremail);
+        $getuserquerry->execute();
+        return $getuserquerry->fetch(PDO::FETCH_ASSOC);
     }
 
     private function isUserExist($username, $email){
         $sql = "SELECT id FROM train_up_users WHERE username = ? OR email = ?";
         $userexistquerry = $this->con->prepare($sql);
-        if ($userexistquerry->execute([$username, $email])) {
-            return $userexistquerry->rowCount() > 0;
-        }
-        return false;
+        $userexistquerry->bind_param("ss", $username, $email);
+        $userexistquerry->execute();
+        $userexistquerry->store_result();
+        return $userexistquerry->num_rows > 0;
     }
 
      public function deleteUser($userId) {
     // Prepare the delete statement
     $sql = "DELETE FROM train_up_users WHERE id = ?";
-    $stmt = $this->con->prepare($sql);
+    $stmt = pg_prepare($this->con, "", $sql);
 
     if (!$stmt) {
         // Failed to prepare the statement
         return 2; // Error code
     }
 
-    if ($stmt->execute([$userId])) {
+    $stmt->bind_param("i", $userId);
+
+    if ($stmt->execute()) {
         // Check if a row was actually deleted
-        if ($stmt->rowCount() > 0) {
+        if ($stmt->affected_rows > 0) {
             return 0; // Success
         } else {
             return 1; // User not found
@@ -110,29 +121,35 @@ class Db_operations {
                 (user_id, distance_km, time_minutes, weather, speed_kmh, calories_burned, note)
                 VALUES (?, ?, ?, ?, ?, ?, ?)";
 
-        $stmt = $this->con->prepare($sql);
+        $stmt = pg_prepare($this->con, "", $sql);
         if (!$stmt) {
-            return array("error" => true, "message" => "Prepare failed: " . $this->con->errorInfo()[2]);
+            return array("error" => true, "message" => "Prepare failed: " . $this->con->error);
         }
 
-        if ($stmt->execute([$userId, $distanceKm, $timeMinutes, $weather, $speedKmh, $caloriesBurned, $note])) {
+        // i: int, d: double, d: double, s: string, d: double, d: double, s: string
+        $stmt->bind_param("iddsdds", $userId, $distanceKm, $timeMinutes, $weather, $speedKmh, $caloriesBurned, $note);
+
+        if ($stmt->execute()) {
             return array("error" => false, "message" => "Running activity saved successfully");
         } else {
-            return array("error" => true, "message" => "Execute failed: " . $stmt->errorInfo()[2]);
+            return array("error" => true, "message" => "Execute failed: " . $stmt->error);
         }
     }
 
     public function saveCyclingActivity($userId, $distanceKm, $timeMinutes, $weather, $bikeType, $speedKmh, $caloriesBurned, $note)
     {
-        $stmt = $this->con->prepare("INSERT INTO cycling_activities (user_id, distance, time_minutes, weather, bike_type, speed, calories, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = pg_prepare($this->con, "", "INSERT INTO cycling_activities (user_id, distance, time_minutes, weather, bike_type, speed, calories, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         if (!$stmt) {
-            return array("error" => true, "message" => "Prepare failed: " . $this->con->errorInfo()[2]);
+            return array("error" => true, "message" => "Prepare failed: " . $this->con->error);
         }
 
-        if ($stmt->execute([$userId, $distanceKm, $timeMinutes, $weather, $bikeType, $speedKmh, $caloriesBurned, $note])) {
+        // i d d s s d d s
+        $stmt->bind_param("iddssdds", $userId, $distanceKm, $timeMinutes, $weather, $bikeType, $speedKmh, $caloriesBurned, $note);
+
+        if ($stmt->execute()) {
             return array("error" => false, "message" => "Cycling activity saved successfully");
         } else {
-            return array("error" => true, "message" => "Failed to save cycling activity: " . $stmt->errorInfo()[2]);
+            return array("error" => true, "message" => "Failed to save cycling activity: " . $stmt->error);
         }
     }
 
@@ -145,13 +162,16 @@ class Db_operations {
         ");
 
         if (!$stmt) {
-            return array("error" => true, "message" => "Prepare failed: " . $this->con->errorInfo()[2]);
+            return array("error" => true, "message" => "Prepare failed: " . $this->con->error);
         }
 
-        if ($stmt->execute([$userId, $exerciseName, $sets, $reps, $weightKg, $timeMinutes, $calories, $note])) {
+        // i s i i d d d s
+        $stmt->bind_param("isiiddds", $userId, $exerciseName, $sets, $reps, $weightKg, $timeMinutes, $calories, $note);
+
+        if ($stmt->execute()) {
             return array("error" => false, "message" => "Weightlifting activity saved successfully");
         } else {
-            return array("error" => true, "message" => "Database error: " . $stmt->errorInfo()[2]);
+            return array("error" => true, "message" => "Database error: " . $stmt->error);
         }
     }
 
@@ -163,33 +183,39 @@ class Db_operations {
             VALUES (?, ?, ?, ?, ?, ?)
         ";
 
-        $stmt = $this->con->prepare($sql);
+        $stmt = pg_prepare($this->con, "", $sql);
         if (!$stmt) {
-            return array("error" => true, "message" => "Prepare failed: " . $this->con->errorInfo()[2]);
+            return array("error" => true, "message" => "Prepare failed: " . $this->con->error);
         }
 
+        // i s d s d s  (assuming intensity stored as string; adjust if different)
+        $stmt->bind_param("isdsds", $userId, $sessionType, $durationMinutes, $intensity, $calories, $note);
+
         try {
-            if ($stmt->execute([$userId, $sessionType, $durationMinutes, $intensity, $calories, $note])) {
+            if ($stmt->execute()) {
                 return array("error" => false, "message" => "Yoga activity saved successfully");
             } else {
-                return array("error" => true, "message" => "Execute failed: " . $stmt->errorInfo()[2]);
+                return array("error" => true, "message" => "Execute failed: " . $stmt->error);
             }
-        } catch (Exception $ex) {
+        } catch (mysqli_sql_exception $ex) {
             return array("error" => true, "message" => "Database Error: " . $ex->getMessage());
         }
     }
 
     public function saveSwimmingActivity($userId, $distanceMeters, $timeMinutes, $weather, $strokeType, $speedMps, $caloriesBurned, $note)
     {
-        $stmt = $this->con->prepare("INSERT INTO swimming_activities (user_id, distance_meters, time_minutes, weather, stroke_type, speed_mps, calories_burned, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = pg_prepare($this->con, "", "INSERT INTO swimming_activities (user_id, distance_meters, time_minutes, weather, stroke_type, speed_mps, calories_burned, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         if (!$stmt) {
-            return array('error' => true, 'message' => 'Prepare failed: ' . $this->con->errorInfo()[2]);
+            return array('error' => true, 'message' => 'Prepare failed: ' . $this->con->error);
         }
 
-        if ($stmt->execute([$userId, $distanceMeters, $timeMinutes, $weather, $strokeType, $speedMps, $caloriesBurned, $note])) {
+        // i d d s s d d s
+        $stmt->bind_param("iddssdds", $userId, $distanceMeters, $timeMinutes, $weather, $strokeType, $speedMps, $caloriesBurned, $note);
+
+        if ($stmt->execute()) {
             return ['error' => false, 'message' => 'Swimming activity saved successfully'];
         } else {
-            return ['error' => true, 'message' => 'Failed to save swimming activity: ' . $stmt->errorInfo()[2]];
+            return ['error' => true, 'message' => 'Failed to save swimming activity: ' . $stmt->error];
         }
     }
 
@@ -201,13 +227,16 @@ class Db_operations {
         );
 
         if ($stmt) {
-            if ($stmt->execute([$userId, $distanceKm, $timeMinutes, $weather, $speedKmh, $caloriesBurned, $note])) {
+            // i d d s d d s
+            $stmt->bind_param("iddsdds", $userId, $distanceKm, $timeMinutes, $weather, $speedKmh, $caloriesBurned, $note);
+
+            if ($stmt->execute()) {
                 return ['error' => false, 'message' => 'Walking activity saved successfully'];
             } else {
-                return ['error' => true, 'message' => 'Failed to save walking activity: ' . $stmt->errorInfo()[2]];
+                return ['error' => true, 'message' => 'Failed to save walking activity: ' . $stmt->error];
             }
         } else {
-            return ['error' => true, 'message' => 'Database error: ' . $this->con->errorInfo()[2]];
+            return ['error' => true, 'message' => 'Database error: ' . $this->con->error];
         }
     }
 
@@ -217,31 +246,33 @@ class Db_operations {
     public function saveGoal($userId, $activityType, $durationOption = null, $notes = null)
     {
         $sql = "INSERT INTO goals (user_id, activity_type, duration_option, notes) VALUES (?, ?, ?, ?)";
-        $stmt = $this->con->prepare($sql);
+        $stmt = pg_prepare($this->con, "", $sql);
         if (!$stmt) {
-            return array('error' => true, 'message' => 'Prepare failed: ' . $this->con->errorInfo()[2]);
+            return array('error' => true, 'message' => 'Prepare failed: ' . $this->con->error);
         }
 
-        if ($stmt->execute([$userId, $activityType, $durationOption, $notes])) {
-            $goalId = $this->con->lastInsertId();
+        $stmt->bind_param("isss", $userId, $activityType, $durationOption, $notes);
+        if ($stmt->execute()) {
+            $goalId = $this->con->insert_id;
             return array('error' => false, 'message' => 'Goal created', 'goal_id' => $goalId);
         } else {
-            return array('error' => true, 'message' => 'Execute failed: ' . $stmt->errorInfo()[2]);
+            return array('error' => true, 'message' => 'Execute failed: ' . $stmt->error);
         }
     }
 
     public function saveGoalTarget($goalId, $metricKey, $value, $unit = null)
     {
         $sql = "INSERT INTO goal_targets (goal_id, metric_key, value, unit) VALUES (?, ?, ?, ?)";
-        $stmt = $this->con->prepare($sql);
+        $stmt = pg_prepare($this->con, "", $sql);
         if (!$stmt) {
-            return array('error' => true, 'message' => 'Prepare failed: ' . $this->con->errorInfo()[2]);
+            return array('error' => true, 'message' => 'Prepare failed: ' . $this->con->error);
         }
 
-        if ($stmt->execute([$goalId, $metricKey, $value, $unit])) {
+        $stmt->bind_param("isds", $goalId, $metricKey, $value, $unit);
+        if ($stmt->execute()) {
             return array('error' => false, 'message' => 'Target saved');
         } else {
-            return array('error' => true, 'message' => 'Execute failed: ' . $stmt->errorInfo()[2]);
+            return array('error' => true, 'message' => 'Execute failed: ' . $stmt->error);
         }
     }
 
@@ -278,27 +309,29 @@ class Db_operations {
             $cal_col = $t['cal'];
 
             // Today's total activities
-            $stmt = $this->con->prepare("SELECT COUNT(*) as total FROM $table WHERE user_id = ? AND $date_col BETWEEN ? AND ?");
+            $stmt = pg_prepare($this->con, "", "SELECT COUNT(*) as total FROM $table WHERE user_id = ? AND $date_col BETWEEN ? AND ?");
             if ($stmt) {
-                if ($stmt->execute([$userId, $today_start, $today_end])) {
-                    $today_result = $stmt->fetch(PDO::FETCH_ASSOC);
+                $stmt->bind_param('iss', $userId, $today_start, $today_end);
+                if ($stmt->execute()) {
+                    $today_result = pg_fetch_assoc($result);
                     $today_count = intval($today_result['total'] ?? 0);
                     $today_total += $today_count;
                 }
-            }
+                }
 
             // Weekly total + calories
-            $stmt = $this->con->prepare("SELECT COUNT(*) as total, COALESCE(SUM($cal_col), 0) as total_calories FROM $table WHERE user_id = ? AND $date_col BETWEEN ? AND ?");
+            $stmt = pg_prepare($this->con, "", "SELECT COUNT(*) as total, COALESCE(SUM($cal_col), 0) as total_calories FROM $table WHERE user_id = ? AND $date_col BETWEEN ? AND ?");
             if ($stmt) {
-                if ($stmt->execute([$userId, $week_start, $week_end])) {
-                    $week_result = $stmt->fetch(PDO::FETCH_ASSOC);
+                $stmt->bind_param('iss', $userId, $week_start, $week_end);
+                if ($stmt->execute()) {
+                    $week_result = pg_fetch_assoc($result);
                     $week_count = intval($week_result['total'] ?? 0);
                     $week_cal = floatval($week_result['total_calories'] ?? 0);
 
                     $weekly_total += $week_count;
                     $weekly_calories += $week_cal;
                 }
-            }
+                }
         }
 
         $response['error'] = false;
@@ -325,26 +358,37 @@ class Db_operations {
                     ORDER BY g.created_at DESC 
                     LIMIT 100";
 
-            $stmt = $this->con->prepare($sql);
+            $stmt = pg_prepare($this->con, "", $sql);
             if (!$stmt) {
-                throw new Exception('Database prepare error: ' . $this->con->errorInfo()[2]);
+                throw new Exception('Database prepare error: ' . $this->con->error);
             }
 
-            if (!$stmt->execute([$userId])) {
-                throw new Exception('Execute error: ' . $stmt->errorInfo()[2]);
+            $stmt->bind_param("i", $userId);
+
+            if (!$stmt->execute()) {
+                throw new Exception('Execute error: ' . $stmt->error);
             }
+
+            $result = $stmt->get_result();
 
             $goals = array();
-            while ($goal = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            while ($goal = $result) {
                 $goalId = $goal['id'];
 
                 $targetSql = "SELECT metric_key, value, unit FROM goal_targets WHERE goal_id = ?";
                 $targetStmt = $this->con->prepare($targetSql);
                 if ($targetStmt) {
-                    $targetStmt->execute([$goalId]);
-                    $targets = $targetStmt->fetchAll(PDO::FETCH_ASSOC);
+                    $targetStmt->bind_param("i", $goalId);
+                    $targetStmt->execute();
+                    $targetResult = $targetStmt->get_result();
+
+                    $targets = array();
+                    while ($target = $targetResult->fetch_assoc()) {
+                        $targets[] = $target;
+                    }
 
                     $goal['targets'] = $targets;
+                    $targetStmt->close();
                 }
 
                 $goals[] = $goal;
@@ -367,7 +411,7 @@ class Db_operations {
     }
 
     // -------------------------
-    // COMPREHENSIVE STATS (master aggregator) — keep this as the single entry point
+    // COMPREHENSIVE STATS (master aggregator) â€” keep this as the single entry point
     // -------------------------
     public function getComprehensiveStatistics($userId) {
         $response = array();
@@ -432,8 +476,8 @@ class Db_operations {
                 FROM running_activities 
                 WHERE user_id = ? AND speed_kmh > 0
             ");
-            $stmt->execute([$userId]);
-            $runningResult = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = pg_execute($this->con, "", array($userId));
+            $runningResult = pg_fetch_assoc($result);
             $avgRunningSpeed = floatval($runningResult['avg_speed'] ?? 0);
             $avgPace = $avgRunningSpeed > 0 ? (60 / $avgRunningSpeed) : 0.0; // minutes per km
             $metrics['avg_running_pace'] = $avgPace > 0 ? $this->minutesFloatToMinSec($avgPace) : "0:00";
@@ -444,8 +488,8 @@ class Db_operations {
                 FROM walking_activities 
                 WHERE user_id = ? AND speed_kmh > 0
             ");
-            $stmt->execute([$userId]);
-            $walkingResult = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = pg_execute($this->con, "", array($userId));
+            $walkingResult = pg_fetch_assoc($result);
             $avgWalkingSpeed = floatval($walkingResult['avg_speed'] ?? 0);
             $avgWalkingPace = $avgWalkingSpeed > 0 ? (60 / $avgWalkingSpeed) : 0.0;
             $metrics['avg_walking_pace'] = $avgWalkingPace > 0 ? $this->minutesFloatToMinSec($avgWalkingPace) : "0:00";
@@ -456,8 +500,8 @@ class Db_operations {
                 FROM swimming_activities 
                 WHERE user_id = ? AND speed_mps > 0
             ");
-            $stmt->execute([$userId]);
-            $swimResult = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = pg_execute($this->con, "", array($userId));
+            $swimResult = pg_fetch_assoc($result);
             $avgSwimSpeed = floatval($swimResult['avg_speed'] ?? 0); // meters per second
             if ($avgSwimSpeed > 0) {
                 // meters per minute = speed_mps * 60
@@ -474,8 +518,8 @@ class Db_operations {
                 FROM cycling_activities 
                 WHERE user_id = ? AND speed > 0
             ");
-            $stmt->execute([$userId]);
-            $cyclingResult = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = pg_execute($this->con, "", array($userId));
+            $cyclingResult = pg_fetch_assoc($result);
             $metrics['avg_cycling_speed'] = $cyclingResult['avg_speed'] ? number_format(floatval($cyclingResult['avg_speed']), 1) : "0.0";
 
             // Max weight lifted
@@ -484,8 +528,8 @@ class Db_operations {
                 FROM weightlifting_activities 
                 WHERE user_id = ?
             ");
-            $stmt->execute([$userId]);
-            $weightResult = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = pg_execute($this->con, "", array($userId));
+            $weightResult = pg_fetch_assoc($result);
             $metrics['max_weight'] = $weightResult['max_weight'] !== null ? intval($weightResult['max_weight']) : 0;
 
             // Average yoga duration
@@ -494,8 +538,8 @@ class Db_operations {
                 FROM yoga_activities 
                 WHERE user_id = ?
             ");
-            $stmt->execute([$userId]);
-            $yogaResult = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = pg_execute($this->con, "", array($userId));
+            $yogaResult = pg_fetch_assoc($result);
             $metrics['avg_yoga_duration'] = $yogaResult['avg_duration'] ? round(floatval($yogaResult['avg_duration'])) : 0;
 
         } catch (Exception $e) {
@@ -524,8 +568,8 @@ class Db_operations {
                 FROM running_activities 
                 WHERE user_id = ?
             ");
-            $stmt->execute([$userId]);
-            $runResult = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = pg_execute($this->con, "", array($userId));
+            $runResult = pg_fetch_assoc($result);
             $records['longest_run'] = $runResult['longest_run'] !== null ? number_format(floatval($runResult['longest_run']), 1) : "0.0";
 
             // Longest cycling ride
@@ -534,8 +578,8 @@ class Db_operations {
                 FROM cycling_activities 
                 WHERE user_id = ?
             ");
-            $stmt->execute([$userId]);
-            $cycleResult = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = pg_execute($this->con, "", array($userId));
+            $cycleResult = pg_fetch_assoc($result);
             $records['longest_ride'] = $cycleResult['longest_ride'] !== null ? number_format(floatval($cycleResult['longest_ride']), 1) : "0.0";
 
             // Heaviest weight lifted
@@ -544,8 +588,8 @@ class Db_operations {
                 FROM weightlifting_activities 
                 WHERE user_id = ?
             ");
-            $stmt->execute([$userId]);
-            $weightResult = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = pg_execute($this->con, "", array($userId));
+            $weightResult = pg_fetch_assoc($result);
             $records['heaviest_lift'] = $weightResult['heaviest_lift'] !== null ? intval($weightResult['heaviest_lift']) : 0;
 
             // Longest swim (convert meters -> km)
@@ -554,8 +598,8 @@ class Db_operations {
                 FROM swimming_activities 
                 WHERE user_id = ?
             ");
-            $stmt->execute([$userId]);
-            $swimResult = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = pg_execute($this->con, "", array($userId));
+            $swimResult = pg_fetch_assoc($result);
             $records['longest_swim'] = $swimResult['longest_swim'] !== null ? number_format((floatval($swimResult['longest_swim']) / 1000.0), 1) : "0.0";
 
             // Longest walk
@@ -564,8 +608,8 @@ class Db_operations {
                 FROM walking_activities 
                 WHERE user_id = ?
             ");
-            $stmt->execute([$userId]);
-            $walkResult = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = pg_execute($this->con, "", array($userId));
+            $walkResult = pg_fetch_assoc($result);
             $records['longest_walk'] = $walkResult['longest_walk'] !== null ? number_format(floatval($walkResult['longest_walk']), 1) : "0.0";
 
             // Longest yoga session
@@ -574,8 +618,8 @@ class Db_operations {
                 FROM yoga_activities 
                 WHERE user_id = ?
             ");
-            $stmt->execute([$userId]);
-            $yogaResult = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = pg_execute($this->con, "", array($userId));
+            $yogaResult = pg_fetch_assoc($result);
             $records['longest_yoga'] = $yogaResult['longest_yoga'] !== null ? intval($yogaResult['longest_yoga']) : 0;
 
         } catch (Exception $e) {
@@ -786,7 +830,7 @@ class Db_operations {
         error_log("Generic Metric: " . $this->extractGenericMetric($metricKey));
 
         if (empty($table) || empty($column)) {
-            error_log("❌ No matching table or column found!");
+            error_log("âŒ No matching table or column found!");
             return 0;
         }
 
@@ -799,20 +843,19 @@ class Db_operations {
             error_log("Time Window: $startDate to $endDate");
 
             $sql = "SELECT MAX($column) as best_value FROM $table WHERE user_id = ? AND $column > 0 AND created_at BETWEEN ? AND ?";
-            $stmt = $this->con->prepare($sql);
+            $stmt = pg_prepare($this->con, "", $sql);
             if (!$stmt) {
-                error_log("❌ Failed to prepare SQL statement");
+                error_log("âŒ Failed to prepare SQL statement");
                 return 0;
             }
             
-            $stmt->execute([$userId, $startDate, $endDate]);
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = pg_execute($this->con, "", array($userId, $startDate, $endDate));
+            $result = pg_fetch_assoc($result);
             $bestValue = floatval($result['best_value'] ?? 0);
-            
-            error_log("✅ Found best value: $bestValue (within time window)");
+            error_log("âœ… Found best value: $bestValue (within time window)");
             return $bestValue;
         } catch (Exception $e) {
-            error_log("❌ Error in getBestPerformance: " . $e->getMessage());
+            error_log("âŒ Error in getBestPerformance: " . $e->getMessage());
             return 0;
         }
     }
@@ -900,15 +943,17 @@ class Db_operations {
             $counts = array();
 
             foreach ($tables as $table) {
-                $stmt = $this->con->prepare("SELECT COUNT(*) as count FROM $table WHERE user_id = ?");
-                if ($stmt) {
-                    $stmt->execute([$userId]);
-                    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-                    $count = intval($result['count'] ?? 0);
-                    $counts[$table] = $count;
-                    $totalActivities += $count;
+                $stmt = pg_prepare($this->con, "", "SELECT COUNT(*) as count FROM $table WHERE user_id = ?");
+                if (!$stmt) {
+                    $counts[$table] = 0;
+                    continue;
                 }
-            }
+                $result = pg_execute($this->con, "", array($userId));
+                $result = pg_fetch_assoc($result);
+                $count = intval($result['count'] ?? 0);
+                $counts[$table] = $count;
+                $totalActivities += $count;
+                }
 
             if ($totalActivities > 0) {
                 $distribution['running'] = round(($counts['running_activities'] / $totalActivities) * 100);
@@ -940,7 +985,7 @@ class Db_operations {
     }
 
     // -------------------------
-    // CURRENT STREAK — fixed for PostgreSQL
+    // CURRENT STREAK â€” fixed binding
     // -------------------------
     public function calculateCurrentStreak($userId) {
         try {
@@ -954,23 +999,23 @@ class Db_operations {
                     UNION ALL SELECT created_at FROM swimming_activities WHERE user_id = ?
                     UNION ALL SELECT created_at FROM walking_activities WHERE user_id = ?
                 ) AS all_activities 
-                WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+                WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
             ";
 
-            $stmt = $this->con->prepare($sql);
+            $stmt = pg_prepare($this->con, "", $sql);
             if (!$stmt) {
                 return 0;
             }
 
-            $stmt->execute([$userId, $userId, $userId, $userId, $userId, $userId]);
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            // bind the same userId to each placeholder
+            $result = pg_execute($this->con, "", array($userId, $userId, $userId, $userId, $userId, $userId));
+            $result = pg_fetch_assoc($result);
             return intval($result['active_days'] ?? 0);
 
         } catch (Exception $e) {
             return 0; // default streak zero to indicate no data
         }
     }
-
     // -------------------------
 // MONTHLY CALORIES DATA FOR LINE CHART
 // -------------------------
@@ -1002,60 +1047,54 @@ public function getCurrentMonthCaloriesData($userId) {
             FROM running_activities 
             WHERE user_id = ? AND created_at BETWEEN ? AND ?
         ");
-        $stmt->execute([$userId, $currentMonthStart, $currentMonthEnd]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $result = pg_execute($this->con, "", array($userId, $currentMonthStart, $currentMonthEnd));
+        $result = pg_fetch_assoc($result);
         $caloriesData['running'] = floatval($result['total_calories'] ?? 0);
-        
         // Cycling calories - current month only
         $stmt = $this->con->prepare("
             SELECT COALESCE(SUM(calories), 0) as total_calories 
             FROM cycling_activities 
             WHERE user_id = ? AND created_at BETWEEN ? AND ?
         ");
-        $stmt->execute([$userId, $currentMonthStart, $currentMonthEnd]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $result = pg_execute($this->con, "", array($userId, $currentMonthStart, $currentMonthEnd));
+        $result = pg_fetch_assoc($result);
         $caloriesData['cycling'] = floatval($result['total_calories'] ?? 0);
-        
         // Weightlifting calories - current month only
         $stmt = $this->con->prepare("
             SELECT COALESCE(SUM(calories), 0) as total_calories 
             FROM weightlifting_activities 
             WHERE user_id = ? AND created_at BETWEEN ? AND ?
         ");
-        $stmt->execute([$userId, $currentMonthStart, $currentMonthEnd]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $result = pg_execute($this->con, "", array($userId, $currentMonthStart, $currentMonthEnd));
+        $result = pg_fetch_assoc($result);
         $caloriesData['weightlifting'] = floatval($result['total_calories'] ?? 0);
-        
         // Yoga calories - current month only
         $stmt = $this->con->prepare("
             SELECT COALESCE(SUM(calories), 0) as total_calories 
             FROM yoga_activities 
             WHERE user_id = ? AND created_at BETWEEN ? AND ?
         ");
-        $stmt->execute([$userId, $currentMonthStart, $currentMonthEnd]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $result = pg_execute($this->con, "", array($userId, $currentMonthStart, $currentMonthEnd));
+        $result = pg_fetch_assoc($result);
         $caloriesData['yoga'] = floatval($result['total_calories'] ?? 0);
-        
         // Swimming calories - current month only
         $stmt = $this->con->prepare("
             SELECT COALESCE(SUM(calories_burned), 0) as total_calories 
             FROM swimming_activities 
             WHERE user_id = ? AND created_at BETWEEN ? AND ?
         ");
-        $stmt->execute([$userId, $currentMonthStart, $currentMonthEnd]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $result = pg_execute($this->con, "", array($userId, $currentMonthStart, $currentMonthEnd));
+        $result = pg_fetch_assoc($result);
         $caloriesData['swimming'] = floatval($result['total_calories'] ?? 0);
-        
         // Walking calories - current month only
         $stmt = $this->con->prepare("
             SELECT COALESCE(SUM(calories_burned), 0) as total_calories 
             FROM walking_activities 
             WHERE user_id = ? AND created_at BETWEEN ? AND ?
         ");
-        $stmt->execute([$userId, $currentMonthStart, $currentMonthEnd]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $result = pg_execute($this->con, "", array($userId, $currentMonthStart, $currentMonthEnd));
+        $result = pg_fetch_assoc($result);
         $caloriesData['walking'] = floatval($result['total_calories'] ?? 0);
-        
         $response['error'] = false;
         $response['current_month'] = $currentMonthLabel;
         $response['calories_data'] = $caloriesData;
@@ -1104,12 +1143,12 @@ private function getTotalActivitiesCount($userId) {
     $totalCount = 0;
     
     foreach ($tables as $table) {
-        $stmt = $this->con->prepare("SELECT COUNT(*) as count FROM $table WHERE user_id = ?");
+        $stmt = pg_prepare($this->con, "", "SELECT COUNT(*) as count FROM $table WHERE user_id = ?");
         if ($stmt) {
-            $stmt->execute([$userId]);
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = pg_execute($this->con, "", array($userId));
+            $result = pg_fetch_assoc($result);
             $totalCount += intval($result['count'] ?? 0);
-        }
+            }
     }
     
     return $totalCount;
@@ -1117,15 +1156,14 @@ private function getTotalActivitiesCount($userId) {
 
 private function getTotalGoalsCount($userId) {
     $sql = "SELECT COUNT(*) as total_goals FROM goals WHERE user_id = ?";
-    $stmt = $this->con->prepare($sql);
+    $stmt = pg_prepare($this->con, "", $sql);
     
     if (!$stmt) {
         return 0;
     }
     
-    $stmt->execute([$userId]);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    
+    $result = pg_execute($this->con, "", array($userId));
+    $result = pg_fetch_assoc($result);
     return intval($result['total_goals'] ?? 0);
 }
 
@@ -1146,11 +1184,11 @@ public function getAllActivities($userId) {
             WHERE user_id = ?
             ORDER BY created_at DESC
         ");
-        $stmt->execute([$userId]);
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $result = pg_execute($this->con, "", array($userId));
+        $rows = pg_fetch_all($result);
+        foreach($rows as $row) {
             $activities[] = $row;
         }
-
         // Cycling activities
         $stmt = $this->con->prepare("
             SELECT id, 'cycling' as activity_type, distance as distance_km, time_minutes, weather, 
@@ -1159,11 +1197,11 @@ public function getAllActivities($userId) {
             WHERE user_id = ?
             ORDER BY created_at DESC
         ");
-        $stmt->execute([$userId]);
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $result = pg_execute($this->con, "", array($userId));
+        $rows = pg_fetch_all($result);
+        foreach($rows as $row) {
             $activities[] = $row;
         }
-
         // Walking activities
         $stmt = $this->con->prepare("
             SELECT id, 'walking' as activity_type, distance_km, time_minutes, weather, 
@@ -1172,11 +1210,11 @@ public function getAllActivities($userId) {
             WHERE user_id = ?
             ORDER BY created_at DESC
         ");
-        $stmt->execute([$userId]);
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $result = pg_execute($this->con, "", array($userId));
+        $rows = pg_fetch_all($result);
+        foreach($rows as $row) {
             $activities[] = $row;
         }
-
         // Swimming activities
         $stmt = $this->con->prepare("
             SELECT id, 'swimming' as activity_type, distance_meters, time_minutes, weather, 
@@ -1185,11 +1223,11 @@ public function getAllActivities($userId) {
             WHERE user_id = ?
             ORDER BY created_at DESC
         ");
-        $stmt->execute([$userId]);
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $result = pg_execute($this->con, "", array($userId));
+        $rows = pg_fetch_all($result);
+        foreach($rows as $row) {
             $activities[] = $row;
         }
-
         // Yoga activities
         $stmt = $this->con->prepare("
             SELECT id, 'yoga' as activity_type, session_type, duration_minutes as time_minutes, 
@@ -1198,11 +1236,11 @@ public function getAllActivities($userId) {
             WHERE user_id = ?
             ORDER BY created_at DESC
         ");
-        $stmt->execute([$userId]);
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $result = pg_execute($this->con, "", array($userId));
+        $rows = pg_fetch_all($result);
+        foreach($rows as $row) {
             $activities[] = $row;
         }
-
         // Weightlifting activities
         $stmt = $this->con->prepare("
             SELECT id, 'weightlifting' as activity_type, exercise_name, sets, reps, weight_kg, 
@@ -1211,11 +1249,11 @@ public function getAllActivities($userId) {
             WHERE user_id = ?
             ORDER BY created_at DESC
         ");
-        $stmt->execute([$userId]);
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $result = pg_execute($this->con, "", array($userId));
+        $rows = pg_fetch_all($result);
+        foreach($rows as $row) {
             $activities[] = $row;
         }
-
         // Sort all activities by date (newest first)
         usort($activities, function($a, $b) {
             return strtotime($b['created_at']) - strtotime($a['created_at']);
@@ -1255,14 +1293,16 @@ public function deleteActivity($userId, $activityId, $activityType) {
         }
 
         $sql = "DELETE FROM $table WHERE id = ? AND user_id = ?";
-        $stmt = $this->con->prepare($sql);
+        $stmt = pg_prepare($this->con, "", $sql);
         
         if (!$stmt) {
-            throw new Exception("Prepare failed: " . $this->con->errorInfo()[2]);
+            throw new Exception("Prepare failed: " . $this->con->error);
         }
 
-        if ($stmt->execute([$activityId, $userId])) {
-            if ($stmt->rowCount() > 0) {
+        $stmt->bind_param("ii", $activityId, $userId);
+
+        if ($stmt->execute()) {
+            if ($stmt->affected_rows > 0) {
                 $response['error'] = false;
                 $response['message'] = "Activity deleted successfully";
             } else {
@@ -1270,10 +1310,10 @@ public function deleteActivity($userId, $activityId, $activityType) {
                 $response['message'] = "Activity not found or you don't have permission";
             }
         } else {
-            throw new Exception("Execute failed: " . $stmt->errorInfo()[2]);
+            throw new Exception("Execute failed: " . $stmt->error);
         }
 
-    } catch (Exception $e) {
+        } catch (Exception $e) {
         $response['error'] = true;
         $response['message'] = "Error deleting activity: " . $e->getMessage();
     }
@@ -1289,20 +1329,21 @@ public function deleteGoal($userId, $goalId) {
 
     try {
         // First delete goal targets
-        $stmt = $this->con->prepare("DELETE FROM goal_targets WHERE goal_id = ?");
+        $stmt = pg_prepare($this->con, "", "DELETE FROM goal_targets WHERE goal_id = ?");
         if (!$stmt) {
-            throw new Exception("Prepare failed for goal_targets: " . $this->con->errorInfo()[2]);
+            throw new Exception("Prepare failed for goal_targets: " . $this->con->error);
         }
-        $stmt->execute([$goalId]);
-
+        $result = pg_execute($this->con, "", array($goalId));
         // Then delete the goal
-        $stmt = $this->con->prepare("DELETE FROM goals WHERE id = ? AND user_id = ?");
+        $stmt = pg_prepare($this->con, "", "DELETE FROM goals WHERE id = ? AND user_id = ?");
         if (!$stmt) {
-            throw new Exception("Prepare failed for goals: " . $this->con->errorInfo()[2]);
+            throw new Exception("Prepare failed for goals: " . $this->con->error);
         }
 
-        if ($stmt->execute([$goalId, $userId])) {
-            if ($stmt->rowCount() > 0) {
+        $stmt->bind_param("ii", $goalId, $userId);
+
+        if ($stmt->execute()) {
+            if ($stmt->affected_rows > 0) {
                 $response['error'] = false;
                 $response['message'] = "Goal deleted successfully";
             } else {
@@ -1310,10 +1351,10 @@ public function deleteGoal($userId, $goalId) {
                 $response['message'] = "Goal not found or you don't have permission";
             }
         } else {
-            throw new Exception("Execute failed: " . $stmt->errorInfo()[2]);
+            throw new Exception("Execute failed: " . $stmt->error);
         }
 
-    } catch (Exception $e) {
+        } catch (Exception $e) {
         $response['error'] = true;
         $response['message'] = "Error deleting goal: " . $e->getMessage();
     }
